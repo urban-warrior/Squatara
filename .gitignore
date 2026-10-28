@@ -1,3 +1,11 @@
+# IDE configuration
+.idea/
+# PlatformIO generated files
+compile_commands.json
+.pio/
+# files to remain uncontrolled
+include/buttons.h
+
 # Prerequisites
 *.d
 
