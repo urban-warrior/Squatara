@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+
+# set -x  # debug
+
+usage() {
+    SCRIPT=$(basename "$0")
+    echo "Usage: $SCRIPT <PORT> [m->mark, u->unmark]" >&2
+}
+
+ARGC=$#
+if [[ $ARGC -lt 1 || $# -gt 2 ]];then
+    usage
+    exit 1
+fi
+if [[ $ARGC -eq 2 ]];then
+    if [[ $2 != "m" && $2 != "u" ]];then
+        usage
+        exit 1
+    fi
+fi
+
+DUMPFILE=$(mktemp)
+PORT=$1
+trap 'rm -f $DUMPFILE' EXIT
+
+if ! esptool -p "$1" chip-id;then
+    echo "Bad port '$1'?"
+    usage
+    exit 1
+fi
+
+# ask if as expected
+read -r -p "Do you want to continue? [Y/n] " response
+# Convert to lowercase and handle empty input (defaults to yes)
+response="${response,,}" 
+
+if [[ -z "$response" || "$response" =~ ^(y|yes)$ ]]; then
+
+    esptool -s -p "$PORT" read-flash 0xd000 4096 "$DUMPFILE"
+
+    if [[ $ARGC -eq 2 ]];then
+
+        python3 -c '
+        import sys;
+        with open(sys.argv[1], "r+b") as f:
+            f.seek(-4, 2)
+            if (sys.argv[2] == "m"):
+                f.write(b"\xef\xbe\xad\xde")
+            else:
+                f.write(b"\xff\xff\xff\xff")
+        ' "$DUMPFILE" "$2"
+    fi
+
+    # hexdump -v -C "$DUMPFILE"|grep '^00000ff0'  # debug
+
+    if [[ $ARGC -eq 2 ]];then
+        esptool -s -p "$PORT" write-flash 0xd000 "$DUMPFILE"
+    fi
+
+    esptool -s -p "$PORT" read-flash 0xd000 4096 "$DUMPFILE"
+    hexdump -v -C "$DUMPFILE"|grep '^00000ff0'
+else
+    echo "User Cancel!" >&2
+    exit 1
+fi
+
+exit 0
