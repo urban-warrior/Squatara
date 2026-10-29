@@ -15,6 +15,6 @@
 
     * This author has found the PlatformIO device monitor to be barely
    functional, if not useless -- YMMV
-    * The recommended program is tio.
+    * The recommended program is tio
     * The documentation-recommended CoolTerm did not appear to work
    correctly on Linux
