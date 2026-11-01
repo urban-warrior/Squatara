@@ -12,10 +12,10 @@ upload:
 		echo "Must specify PORT=<port device> to upload"; \
 		exit 1; \
 	fi
-	@if ! esptool -p $(PORT) chip-id;then \
-		echo "Bad port '$(PORT)'"; \
-		exit 2; \
-	fi
+	#@if ! esptool -p $(PORT) chip-id;then \
+	#	echo "Bad port '$(PORT)'"; \
+	#	exit 2; \
+	#fi
 	pio run -t upload --upload-port $(PORT)
 
 clean:
