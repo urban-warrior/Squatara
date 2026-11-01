@@ -1,0 +1,52 @@
+#!/usr/bin/env python
+
+import argparse
+import time
+import serial
+
+def run_periodic_command( args):
+    # the following 4 could be converted to commandline arguments if desired
+    baudrate = 115200
+    command ="soc\r\n"
+    interval = 10  # seconds
+    timeout = 4  # seconds
+    port =args.port
+    """Sends a command to a serial port periodically and echoes the output."""
+    try:
+        with serial.Serial(port, baudrate, timeout=timeout) as ser:
+            print(f"Connected to {port} at {baudrate}")
+            # Wait a moment for the device to initialize
+            time.sleep(1)
+
+            ser.write("\r\n".encode("utf-8"))  #stimulate prompt
+            while True:
+                _ = ser.read_until(b"#>\n")  # wait for prompt (and discard)
+                # Send the command (encode string to bytes)
+                ser.write(command.encode("utf-8"))
+                if args.debug: print(f"\n[Sent]: {command.strip()}")
+
+                # Read the response from the device
+                _ = ser.read_until(b"\n")  # await command echo (and discard)
+                response = ser.read_until(b"\n")
+                if response:
+                    decoded_response = response.decode("utf-8", errors="replace").strip()
+                    print(f"{decoded_response}")
+                else:
+                    print(f"No response received {timeout} secs!")
+
+                # Wait for the specified interval before the next execution
+                time.sleep(interval)
+
+    except serial.SerialException as e:
+        print(f"Serial error: {e}")
+    except KeyboardInterrupt:
+        print("\nUser quit!")
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Read State of Charge (SoC) from Squatara (must enable CLI)")
+    parser.add_argument("-p", "--port", required=True)
+    parser.add_argument("-d", "--debug", action="store_true")
+    args = parser.parse_args()
+
+    run_periodic_command(args)
