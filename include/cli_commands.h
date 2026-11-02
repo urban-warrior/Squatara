@@ -296,4 +296,10 @@ CLI_COMMAND(buzztime)
     return 0;
 }
 
+CLI_COMMAND(deepsleep) // test command to force deepsleep
+{
+    initiate_deep_sleep(3000 /* ms */); // won't return!
+    return 0;
+}
+
 #endif //SQUATARA_CLI_COMMANDS_H
