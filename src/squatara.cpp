@@ -21,6 +21,7 @@ static ToF_Sensor floor_sensor(&Wire, 12 /*, address -- defaults to 0x29 */); //
 static bool tof_configured = false;
 static Buzzer buzzer(A0, A5); // DEBUG LED on A5!
 
+constexpr uint8_t usb_pwr_detect_pin = 10;
 // ST77XX_BLACK ST77XX_WHITE ST77XX_RED ST77XX_GREEN ST77XX_BLUE ST77XX_CYAN ST77XX_MAGENTA ST77XX_YELLOW ST77XX_ORANGE
 constexpr int16_t DISPLAY_WIDTH=240;
 constexpr int16_t DISPLAY_HEIGHT=135;
@@ -44,18 +45,24 @@ static void esp32_reset()
 // #include "buttons.h"
 #include "cli_commands.h"
 
-static void show_product_name(const char *name = "Squatara", int16_t y = 13)
+static void canvas_println_centered(const char *text, int16_t y)
 {
     int16_t top_left_x, top_left_y;
     uint16_t text_w, text_h;
 
+    // uses current Font and color
+    canvas.getTextBounds(text, 0, y, &top_left_x, &top_left_y, &text_w, &text_h);
+    canvas.setCursor(static_cast<int16_t>((canvas.width() - text_w) / 2), y);
+    canvas.println(text);
+    Logger.debug("<%s> %d  %d  %u  %u\n", __func__, top_left_x, top_left_y, text_w, text_h);
+}
+
+static void show_product_name(const char *name = "Squatara", int16_t y = 13)
+{
     canvas.setFont(&FreeMono12pt7b);
     canvas.fillScreen(ST77XX_BLACK);
-    canvas.getTextBounds(name, 0, y, &top_left_x, &top_left_y, &text_w, &text_h);
-    Logger.debug("<%s> %d  %d  %u  %u\n", __func__, top_left_x, top_left_y, text_w, text_h);
-    canvas.setCursor(static_cast<int16_t>((canvas.width() - text_w) / 2), y);
     canvas.setTextColor(ST77XX_WHITE);
-    canvas.println(name);
+    canvas_println_centered(name, y);
     display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
     Logger.debug("<%s> X: %u  Y:%u\n", __func__, canvas.getCursorX(), canvas.getCursorY());
 }
@@ -65,7 +72,7 @@ static void show_build(int16_t y = 37)
     canvas.setCursor(0, y);
     canvas.setTextColor(ST77XX_RED);
     canvas.setFont(&FreeMono9pt7b);
-    canvas.println(__DATE__ "@" __TIME__);
+    canvas_println_centered(__DATE__ "@" __TIME__, canvas.getCursorY());
     display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
     Logger.debug("<%s> X: %u  Y:%u\n", __func__, canvas.getCursorX(), canvas.getCursorY());
 }
@@ -79,6 +86,26 @@ static void show_errors(bool tof, bool floor, int16_t y = 55)
     if ( !floor) canvas.println("No Floor Sensor!");
     display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
     Logger.debug("<%s> X: %u  Y:%u\n", __func__, canvas.getCursorX(), canvas.getCursorY());
+}
+
+static void detect_charger(int16_t y = 55)
+{
+    if (!digitalRead(usb_pwr_detect_pin)) return;  // no charger -- normal startup
+
+    display.fillRect(0, y, DISPLAY_WIDTH, static_cast<int16_t>(DISPLAY_HEIGHT - y), ST77XX_BLACK);
+    canvas.setCursor(0, static_cast<int16_t>(y + 7));
+    canvas.setTextColor(ST77XX_YELLOW);
+    canvas.setFont(&FreeMono12pt7b);
+    canvas_println_centered("Please disconnect", canvas.getCursorY());
+    canvas_println_centered("charger until", canvas.getCursorY());
+    canvas_println_centered("device is", canvas.getCursorY());
+    canvas_println_centered("started!", canvas.getCursorY());
+    display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
+    while (digitalRead(usb_pwr_detect_pin))
+    {
+        delay(100);
+    }
+    esp32_reset();
 }
 
 static void timeout_start_screen(unsigned long ms)
@@ -111,6 +138,8 @@ void setup()
     setup_buttons();
 #endif // SQUATARA_BUTTONS_H
     pinMode(TFT_BACKLITE, OUTPUT);
+    pinMode(usb_pwr_detect_pin, INPUT);
+    Logger.info("%u: %u\n", usb_pwr_detect_pin, digitalRead(usb_pwr_detect_pin));
     digitalWrite(TFT_BACKLITE, LOW);
     display.init(DISPLAY_HEIGHT, DISPLAY_WIDTH); // Init ST7789 240x135
     display.setRotation(3);
@@ -145,6 +174,7 @@ void setup()
     show_build();
     show_errors(tof_configured, floor_sensor_configured);
     digitalWrite(TFT_BACKLITE, HIGH);
+    detect_charger();
     timeout_start_screen(5000);
 #ifdef SQUATARA_CLI_COMMANDS_H
     cli_enable_detect();
@@ -291,6 +321,18 @@ static void show_floor_range(int32_t range, int16_t y)
 
 void loop()
 {
+    static bool usb_powered = digitalRead(usb_pwr_detect_pin);
+
+    if (usb_powered && !digitalRead(usb_pwr_detect_pin))
+    {
+        esp32_reset();
+    }
+    else
+    {
+        usb_powered = digitalRead(usb_pwr_detect_pin); // update USB powered status
+    }
+
+
 #ifdef SQUATARA_CLI_COMMANDS_H
     if (cli_begun) cli.loop();
 #endif  // SQUATARA_CLI_COMMANDS_H
