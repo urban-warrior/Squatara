@@ -11,7 +11,6 @@
 #include <DejaVu_Sans_Mono_14.h>
 #include "tof-vl53l4cd.h"
 #include "buzzer.h"
-#include "deepsleep.h"
 #include <DebugLogger.h>
 #include "persistent.h"
 
@@ -26,6 +25,8 @@ static Buzzer buzzer(A0, A5); // DEBUG LED on A5!
 constexpr int16_t DISPLAY_WIDTH=240;
 constexpr int16_t DISPLAY_HEIGHT=135;
 static GFXcanvas16 canvas(DISPLAY_WIDTH, DISPLAY_HEIGHT);
+
+#include "deepsleep.h"
 
 static void esp32_reset()
 {
