@@ -155,7 +155,7 @@ CLI_COMMAND(soc)
     float cell_vdc = lipo.cellVoltage();
     uint32_t uptime = millis()/1000;
 
-    ioStream.printf("{\"timestamp\":\"%lu\", \"SoC\":\"%0.0f\", \"Vdc\":\"%.2f\", \"RoC\":\"%.2f\"}\r\n",
+    ioStream.printf("{\"timestamp\":\"%lu\", \"SoC\":\"%0.1f\", \"Vdc\":\"%.2f\", \"RoC\":\"%.2f\"}\r\n",
                     uptime, cell_soc, cell_vdc, cell_roc);
     return 0;
 }
