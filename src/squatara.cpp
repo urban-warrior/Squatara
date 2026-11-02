@@ -157,11 +157,11 @@ void setup()
     buzzer.on();
     delay(250 /* ms */);
     buzzer.off();
+    lipo.quickStart();
 } // end setup()
 
 static void battery_status_display(int16_t x, int16_t y)
 {
-    lipo.quickStart();
     float cell_soc = lipo.cellPercent();
     [[maybe_unused]] float cell_roc = lipo.chargeRate();
     [[maybe_unused]] float cell_vdc = lipo.cellVoltage();
@@ -185,7 +185,7 @@ static void battery_status_display(int16_t x, int16_t y)
     canvas.setFont(&DejaVu_Sans_Mono_14);
     canvas.fillRect(x, y_rect, DISPLAY_WIDTH, bar_graph_height, ST77XX_BLACK /* ST77XX_RED */);
     canvas.drawRect(x, y_rect, bar_graph_width, bar_graph_height, battery_status_color);
-    canvas.fillRect(x, y_rect, static_cast<int16_t>((bar_graph_width * cell_soc) / 100), bar_graph_height,
+    canvas.fillRect(x, y_rect, static_cast<int16_t>((bar_graph_width * (cell_soc + 0.5)) / 100), bar_graph_height,
                     battery_status_color);
     canvas.setCursor(static_cast<int16_t>(x + bar_graph_width + 4), static_cast<int16_t>(y + 20)); // move to value field
     canvas.print(buf);
