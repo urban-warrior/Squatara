@@ -21,7 +21,6 @@ static ToF_Sensor floor_sensor(&Wire, 12 /*, address -- defaults to 0x29 */); //
 static bool tof_configured = false;
 static Buzzer buzzer(A0, A5); // DEBUG LED on A5!
 
-constexpr uint8_t usb_pwr_detect_pin = 10;
 // ST77XX_BLACK ST77XX_WHITE ST77XX_RED ST77XX_GREEN ST77XX_BLUE ST77XX_CYAN ST77XX_MAGENTA ST77XX_YELLOW ST77XX_ORANGE
 constexpr int16_t DISPLAY_WIDTH=240;
 constexpr int16_t DISPLAY_HEIGHT=135;
@@ -88,26 +87,6 @@ static void show_errors(bool tof, bool floor, int16_t y = 55)
     Logger.debug("<%s> X: %u  Y:%u\n", __func__, canvas.getCursorX(), canvas.getCursorY());
 }
 
-static void detect_charger(int16_t y = 55)
-{
-    if (!digitalRead(usb_pwr_detect_pin)) return;  // no charger -- normal startup
-
-    display.fillRect(0, y, DISPLAY_WIDTH, static_cast<int16_t>(DISPLAY_HEIGHT - y), ST77XX_BLACK);
-    canvas.setCursor(0, static_cast<int16_t>(y + 7));
-    canvas.setTextColor(ST77XX_YELLOW);
-    canvas.setFont(&FreeMono12pt7b);
-    canvas_println_centered("Please disconnect", canvas.getCursorY());
-    canvas_println_centered("charger until", canvas.getCursorY());
-    canvas_println_centered("device is", canvas.getCursorY());
-    canvas_println_centered("started!", canvas.getCursorY());
-    display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
-    while (digitalRead(usb_pwr_detect_pin))
-    {
-        delay(100);
-    }
-    esp32_reset();
-}
-
 static void timeout_start_screen(unsigned long ms)
 {
     unsigned long start = millis();
@@ -138,8 +117,6 @@ void setup()
     setup_buttons();
 #endif // SQUATARA_BUTTONS_H
     pinMode(TFT_BACKLITE, OUTPUT);
-    pinMode(usb_pwr_detect_pin, INPUT);
-    Logger.info("%u: %u\n", usb_pwr_detect_pin, digitalRead(usb_pwr_detect_pin));
     digitalWrite(TFT_BACKLITE, LOW);
     display.init(DISPLAY_HEIGHT, DISPLAY_WIDTH); // Init ST7789 240x135
     display.setRotation(3);
@@ -174,7 +151,6 @@ void setup()
     show_build();
     show_errors(tof_configured, floor_sensor_configured);
     digitalWrite(TFT_BACKLITE, HIGH);
-    detect_charger();
     timeout_start_screen(5000);
 #ifdef SQUATARA_CLI_COMMANDS_H
     cli_enable_detect();
@@ -187,7 +163,6 @@ void setup()
     buzzer.on();
     delay(250 /* ms */);
     buzzer.off();
-    lipo.quickStart();
 } // end setup()
 
 static void battery_status_display(int16_t x, int16_t y)
@@ -211,7 +186,7 @@ static void battery_status_display(int16_t x, int16_t y)
     snprintf(buf, sizeof(buf) - 1, "%3.0f%%", cell_soc);
     if (cell_soc <= minimum_allowed_soc) initiate_deep_sleep(10000);
     uint16_t battery_status_color = (cell_soc >= warning_soc) ? BAR_GRAPH_COLOR : ST77XX_RED;
-    canvas.setTextColor(battery_status_color);
+    canvas.setTextColor((cell_roc <= 0.0) ? battery_status_color : ST77XX_GREEN);
     canvas.setFont(&DejaVu_Sans_Mono_14);
     canvas.fillRect(x, y_rect, DISPLAY_WIDTH, bar_graph_height, ST77XX_BLACK /* ST77XX_RED */);
     canvas.drawRect(x, y_rect, bar_graph_width, bar_graph_height, battery_status_color);
@@ -321,18 +296,6 @@ static void show_floor_range(int32_t range, int16_t y)
 
 void loop()
 {
-    static bool usb_powered = digitalRead(usb_pwr_detect_pin);
-
-    if (usb_powered && !digitalRead(usb_pwr_detect_pin))
-    {
-        esp32_reset();
-    }
-    else
-    {
-        usb_powered = digitalRead(usb_pwr_detect_pin); // update USB powered status
-    }
-
-
 #ifdef SQUATARA_CLI_COMMANDS_H
     if (cli_begun) cli.loop();
 #endif  // SQUATARA_CLI_COMMANDS_H
