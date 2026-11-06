@@ -125,6 +125,12 @@ void setup()
     {
         Serial.println("LIPO not found");
     }
+    else
+    {
+        lipo.wake(); // disable hibernation
+        Logger.info("HibThr<0x0A>: %1.1f  ActThr<0x0B>: %1.1f\n",
+            lipo.getHibernationThreshold(), lipo.getActivityThreshold());
+    }
     tof_configured = tof_sensor.configure();
     if (!tof_configured)
     {
@@ -248,7 +254,7 @@ static void show_floor_range(int32_t range, int16_t y)
     constexpr int16_t moving_threshold = 10;
     if (abs(last_range - range) >= moving_threshold)
     {
-        Logger.info("====================== Moving... %lu ========================\n", abs(last_range - range));
+        Logger.debug("====================== Moving... %lu ========================\n", abs(last_range - range));
         // change is larger than noise, so definitely moving
         for (int32_t & i : history)
         {
