@@ -298,7 +298,15 @@ CLI_COMMAND(buzztime)
 
 CLI_COMMAND(deepsleep) // test command to force deepsleep
 {
-    initiate_deep_sleep(3000 /* ms */); // won't return!
+    initiate_deep_sleep(3000 /* ms */, "SLEEP"); // won't return!
+    return 0;
+}
+
+CLI_COMMAND(gpio)
+{
+    if (argc == 0) return 1;
+    int gpio_num = atoi(argv[0]);
+    ioStream.printf("[%u]: %u\r\n", gpio_num, digitalRead(gpio_num));
     return 0;
 }
 
