@@ -26,24 +26,6 @@ constexpr int16_t DISPLAY_WIDTH=240;
 constexpr int16_t DISPLAY_HEIGHT=135;
 static GFXcanvas16 canvas(DISPLAY_WIDTH, DISPLAY_HEIGHT);
 
-#include "deepsleep.h"
-
-static void esp32_reset()
-{
-    canvas.fillScreen(ST77XX_BLACK);
-    canvas.setFont(&FreeMono18pt7b);
-    canvas.setCursor(0, 0);
-    canvas.println(""); // get to start of first line
-    canvas.setTextColor(ST77XX_YELLOW);
-    canvas.println("\n>> RESET <<");
-    display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
-    delay(1000);
-    ESP.restart();
-}
-
-// #include "buttons.h"
-#include "cli_commands.h"
-
 static void canvas_println_centered(const char *text, int16_t y)
 {
     int16_t top_left_x, top_left_y;
@@ -55,6 +37,22 @@ static void canvas_println_centered(const char *text, int16_t y)
     canvas.println(text);
     Logger.debug("<%s> %d  %d  %u  %u\n", __func__, top_left_x, top_left_y, text_w, text_h);
 }
+
+#include "deepsleep.h"
+
+static void esp32_reset()
+{
+    canvas.fillScreen(ST77XX_BLACK);
+    canvas.setFont(&FreeMono18pt7b);
+    canvas.setTextColor(ST77XX_RED);
+    canvas_println_centered(">> RESET <<", 75);
+    display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
+    delay(1000);
+    ESP.restart();
+}
+
+// #include "buttons.h"
+#include "cli_commands.h"
 
 static void show_product_name(const char *name = "Squatara", int16_t y = 13)
 {
@@ -107,11 +105,18 @@ static void timeout_start_screen(unsigned long ms)
 
 void setup()
 {
+    bool lipo_started = lipo.begin();
+    if (!lipo_started)
+    {
+        delay(500); // settle LIPP
+        if (lipo.cellVoltage() <= 3.0) initiate_deep_sleep(0 /* don't do anything except sleep */);
+    }
     preferences.begin("configuration", false /* read-write */);
     Logger.addOutput(&Serial);
     setup_log_level();
     try_start_serial("\033[2J\033[1;1H" BUILD_STAMP);
     Logger.info("C++ Standard Value: %lu\n", __cplusplus);
+    Serial.printf("Wakeup: %u\n", esp_sleep_get_wakeup_cause()); // ESP_SLEEP_WAKEUP_TIMER
     setup_persistent();
 #ifdef SQUATARA_BUTTONS_H
     setup_buttons();
@@ -121,7 +126,7 @@ void setup()
     display.init(DISPLAY_HEIGHT, DISPLAY_WIDTH); // Init ST7789 240x135
     display.setRotation(3);
     Logger.info("Display w: %u  h: %u\n", display.width(), display.height());
-    if (!lipo.begin())
+    if (!lipo_started)
     {
         Serial.println("LIPO not found");
     }
@@ -157,7 +162,9 @@ void setup()
     show_build();
     show_errors(tof_configured, floor_sensor_configured);
     digitalWrite(TFT_BACKLITE, HIGH);
-    timeout_start_screen(5000);
+    pinMode(GPIO_NUM_5, INPUT);
+    Serial.printf("V?: %u\n", esp_sleep_is_valid_wakeup_gpio(GPIO_NUM_5)); // GPIO 5 is OK!
+    timeout_start_screen(3000);
 #ifdef SQUATARA_CLI_COMMANDS_H
     cli_enable_detect();
     if (cli_begun)
@@ -311,11 +318,17 @@ void loop()
     static unsigned long next_battery_millis = 0;
     unsigned long now_millis = millis();
 
+    if (!digitalRead(GPIO_NUM_5)) // watch for power switch
+    {
+        delay(200); // wait some time for debounce
+        if (!digitalRead(GPIO_NUM_5)) initiate_deep_sleep(3000 /* ms */, "Bye!"); // won't return!
+    }
+
     if (preferences.getBool(BATTERY_KEY))
     {
         if (now_millis >= next_battery_millis)
         {
-            constexpr unsigned long battery_interval_ms = 10000;
+            constexpr unsigned long battery_interval_ms = 2000;
 
             next_battery_millis = now_millis + battery_interval_ms;
             battery_status_display(0 /* X position */, 42 /* Y position */);
