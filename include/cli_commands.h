@@ -298,7 +298,7 @@ CLI_COMMAND(buzztime)
 
 CLI_COMMAND(deepsleep) // test command to force deepsleep
 {
-    initiate_deep_sleep(3000 /* ms */, "SLEEP"); // won't return!
+    initiate_deep_sleep(3000 /* ms */, "SLEEP", ST77XX_CYAN); // won't return!
     return 0;
 }
 
