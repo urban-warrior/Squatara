@@ -304,10 +304,32 @@ CLI_COMMAND(deepsleep) // test command to force deepsleep
 
 CLI_COMMAND(gpio)
 {
+    char *end;
+
     if (argc == 0) return 1;
-    int gpio_num = atoi(argv[0]);
-    ioStream.printf("[%u]: %u\r\n", gpio_num, digitalRead(gpio_num));
-    return 0;
+    int gpio_num = static_cast<int>(strtol(argv[0], &end, 10));
+
+    if (*argv[0] != '\0' && *end == '\0')
+    {
+        ioStream.printf("[%u]: %u\r\n", gpio_num, digitalRead(gpio_num));
+        return 0;
+    }
+    return 1;
 }
 
+static bool show_battery = false;
+
+CLI_COMMAND(batt)
+{
+    if (argc != 0)
+    {
+        if (strlen(argv[0]) == 1)
+        {
+            if (argv[0][0] == 'y' || argv[0][0] == 'Y') show_battery = true;
+            if (argv[0][0] == 'n' || argv[0][0] == 'N') show_battery = false;
+        }
+    }
+    ioStream.printf("Show Battery: %c\r\n", show_battery ? 'Y' : 'N');
+    return 0;
+}
 #endif //SQUATARA_CLI_COMMANDS_H
