@@ -2,6 +2,8 @@
 #define DEEPSLEEP_H_
 
 #include "driver/rtc_io.h"
+#include <Fonts/FreeMonoBold18pt7b.h>
+
 static void initiate_deep_sleep(unsigned long delay_ms, const char *msg, uint16_t color=ST77XX_GREEN)
 {
     if (delay_ms != 0)
@@ -9,8 +11,8 @@ static void initiate_deep_sleep(unsigned long delay_ms, const char *msg, uint16_
         canvas.fillScreen(color);
         if (msg != nullptr)
         {
-            canvas.setFont(&FreeMono18pt7b);
-            canvas.setTextColor(ST77XX_WHITE);
+            canvas.setFont(&FreeMonoBold18pt7b);
+            canvas.setTextColor(color != ST77XX_RED ? ST77XX_BLUE : ST77XX_WHITE); // default is BLUE
             canvas_println_centered(msg, 75);
         }
         display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
