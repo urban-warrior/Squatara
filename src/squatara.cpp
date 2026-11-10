@@ -105,11 +105,13 @@ static void timeout_start_screen(unsigned long ms)
 
 void setup()
 {
+    pinMode(GPIO_NUM_5, INPUT);
     bool lipo_started = lipo.begin();
-    if (!lipo_started)
+    if (lipo_started)
     {
-        delay(500); // settle LIPP
-        if (lipo.cellVoltage() <= 3.0) initiate_deep_sleep(0 /* don't do anything except sleep */);
+        delay(500); // settle LIPO
+        if (!digitalRead(GPIO_NUM_5) || (lipo.cellVoltage() <= 3.0))
+            initiate_deep_sleep(0 /* don't do anything except sleep */, nullptr /* no text -- no color */);
     }
     preferences.begin("configuration", false /* read-write */);
     Logger.addOutput(&Serial);
@@ -162,7 +164,6 @@ void setup()
     show_build();
     show_errors(tof_configured, floor_sensor_configured);
     digitalWrite(TFT_BACKLITE, HIGH);
-    pinMode(GPIO_NUM_5, INPUT);
     Serial.printf("V?: %u\n", esp_sleep_is_valid_wakeup_gpio(GPIO_NUM_5)); // GPIO 5 is OK!
     timeout_start_screen(3000);
 #ifdef SQUATARA_CLI_COMMANDS_H
@@ -197,7 +198,7 @@ static void battery_status_display(int16_t x, int16_t y)
 
     if (cell_soc > 100.0) cell_soc = 100.0;
     snprintf(buf, sizeof(buf) - 1, "%3.0f%%", cell_soc);
-    if (cell_soc <= minimum_allowed_soc) initiate_deep_sleep(10000);
+    if (cell_soc <= minimum_allowed_soc) initiate_deep_sleep(10000, "LOW BATT", ST77XX_RED);
     uint16_t battery_status_color = (cell_soc >= warning_soc) ? BAR_GRAPH_COLOR : ST77XX_RED;
     canvas.setTextColor((cell_roc <= 0.0) ? battery_status_color : ST77XX_GREEN);
     canvas.setFont(&DejaVu_Sans_Mono_14);
@@ -289,6 +290,7 @@ static void show_floor_range(int32_t range, int16_t y)
     last_sum = sum;
     if (display_range < 888) snprintf(buf, sizeof(buf) - 1, "%ld", display_range);
     canvas.setFont(&HackRegular26pt7b);
+    // not a duplicate of canvas_println_centered() because does not write entire line
     canvas.getTextBounds(buf, 0, y, &top_left_x, &top_left_y, &text_w, &text_h);
     if (!once)
     {
@@ -296,6 +298,7 @@ static void show_floor_range(int32_t range, int16_t y)
     }
     canvas.setCursor(static_cast<int16_t>((canvas.width() - text_w) / 2), y);
     canvas.setTextColor(ST77XX_GREEN);
+    // watch out -- writes to end of line!  TODO check this!
     canvas.fillRect(0, static_cast<int16_t>(y - text_h), DISPLAY_WIDTH, static_cast<int16_t>(text_h + 1 + 1 + 1), ST77XX_BLACK /* ST77XX_RED */);
     canvas.println(buf);
     display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
@@ -321,7 +324,7 @@ void loop()
     if (!digitalRead(GPIO_NUM_5)) // watch for power switch
     {
         delay(200); // wait some time for debounce
-        if (!digitalRead(GPIO_NUM_5)) initiate_deep_sleep(3000 /* ms */, "Bye!"); // won't return!
+        if (!digitalRead(GPIO_NUM_5)) initiate_deep_sleep(3000 /* ms */, "Bye!", ST77XX_GREEN); // won't return!
     }
 
     if (preferences.getBool(BATTERY_KEY))
