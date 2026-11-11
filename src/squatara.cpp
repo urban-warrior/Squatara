@@ -212,6 +212,40 @@ static void battery_status_display(int16_t x, int16_t y)
     display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
 }
 
+static void show_battery_v_and_roc(int16_t y)
+{
+    char buf[20];
+    int16_t x_rect;
+    int16_t y_rect;
+    uint16_t w;
+    uint16_t h;
+
+    canvas.setTextColor(ST77XX_YELLOW);
+    canvas.setFont(&FreeMono9pt7b);
+    snprintf(buf, sizeof(buf) - 1, "%3.2fV", lipo.cellVoltage());
+    canvas.setCursor(1, y);
+    canvas.getTextBounds(buf, canvas.getCursorX(), canvas.getCursorY(), &x_rect, &y_rect, &w, &h);
+    auto v_rect_tlx = static_cast<int16_t>(x_rect - 1);
+    auto v_rect_tly = static_cast<int16_t>(y_rect - 1);
+    auto v_rect_w = static_cast<int16_t>(w + 2);
+    auto v_rect_h = static_cast<int16_t>(h + 2);
+    canvas.fillRect(v_rect_tlx, v_rect_tly, v_rect_w, v_rect_h, ST77XX_BLACK);
+    canvas.print(buf);
+    float roc = lipo.chargeRate();
+    roc = static_cast<float>((roc >= 0) ? roc + 0.05 : roc - 0.05);
+    snprintf(buf, sizeof(buf) - 1, "%4.1f", fabs(roc));
+    canvas.getTextBounds("-99.9", 0, y, &x_rect, &y_rect, &w, &h);
+    auto r_rect_w = static_cast<int16_t>(w - x_rect - 3);
+    auto r_rect_tlx = static_cast<int16_t>(canvas.width() - r_rect_w);
+    auto r_rect_tly = static_cast<int16_t>(y_rect - 1);
+    auto r_rect_h = static_cast<int16_t>(h + 2);
+    canvas.fillRect(r_rect_tlx, r_rect_tly, r_rect_w, r_rect_h, ST77XX_BLACK);
+    canvas.setCursor(static_cast<int16_t>(r_rect_tlx + 5), y);
+    canvas.setTextColor(roc >= 0 ? ST77XX_CYAN : ST77XX_RED);
+    canvas.print(buf);
+    display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
+}
+
 static uint16_t bar_graph(uint32_t max_value, uint8_t threshold, uint16_t value, int16_t x, int16_t y)
 {
     constexpr uint16_t bar_graph_height = 15;
@@ -247,9 +281,13 @@ static void show_floor_range(int32_t range, int16_t y)
 {
     static bool once = false;
     int32_t display_range = range;
-    int16_t top_left_x, top_left_y;
-    uint16_t text_w, text_h;
-    char buf[10] = "!***!";
+    int16_t top_left_x;
+    int16_t top_left_y;
+    uint16_t text_w;
+    uint16_t text_h;
+    constexpr const char *max_field = "!***!";
+    char buf[10];
+    strncpy(buf, max_field, sizeof(buf));
 
     if (range < 15) return; // should never see valid reading < 15!
 
@@ -291,21 +329,21 @@ static void show_floor_range(int32_t range, int16_t y)
     if (display_range < 888) snprintf(buf, sizeof(buf) - 1, "%ld", display_range);
     canvas.setFont(&HackRegular26pt7b);
     // not a duplicate of canvas_println_centered() because does not write entire line
-    canvas.getTextBounds(buf, 0, y, &top_left_x, &top_left_y, &text_w, &text_h);
-    if (!once)
-    {
-        Logger.debug("<%s> %d  %d  %u  %u\n", __func__, top_left_x, top_left_y, text_w, text_h);
-    }
-    canvas.setCursor(static_cast<int16_t>((canvas.width() - text_w) / 2), y);
+    canvas.getTextBounds(max_field, 0, 0, &top_left_x, &top_left_y, &text_w, &text_h);
+    if (!once) Logger.debug("<%s> %d  %d  %u  %u\n", __func__, top_left_x, top_left_y, text_w, text_h);
     canvas.setTextColor(ST77XX_GREEN);
-    // watch out -- writes to end of line!  TODO check this!
-    canvas.fillRect(0, static_cast<int16_t>(y - text_h), DISPLAY_WIDTH, static_cast<int16_t>(text_h + 1 + 1 + 1), ST77XX_BLACK /* ST77XX_RED */);
+    auto rect_tlx = static_cast<int16_t>((canvas.width() - text_w + top_left_x) / 2);
+    auto rect_tly = static_cast<int16_t>(y - text_h + 1);
+    auto rect_w = static_cast<int16_t>(text_w + 1);
+    auto rect_h = static_cast<int16_t>(text_h + 3);
+    if (!once) Logger.debug("<%s> rect_tlx: %u  rect_tly: %u  rect_w: %u  rect_h: %u\n",
+        __func__, rect_tlx, rect_tly, rect_w, rect_h);
+    canvas.fillRect(rect_tlx, rect_tly, rect_w, rect_h, ST77XX_BLACK);
+    canvas.getTextBounds(buf, 0, 0, &top_left_x, &top_left_y, &text_w, &text_h);
+    canvas.setCursor(static_cast<int16_t>((canvas.width() - text_w - top_left_x) / 2), y);
     canvas.println(buf);
     display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
-    if (!once)
-    {
-        Logger.debug("<%s> X: %u  Y:%u\n", __func__, canvas.getCursorX(), canvas.getCursorY());
-    }
+    if (!once) Logger.debug("<%s> X: %u  Y:%u\n", __func__, canvas.getCursorX(), canvas.getCursorY());
     once = true;
 }
 
@@ -335,6 +373,7 @@ void loop()
 
             next_battery_millis = now_millis + battery_interval_ms;
             battery_status_display(0 /* X position */, 42 /* Y position */);
+            if (true || show_battery) show_battery_v_and_roc(75 /* Y position */);
         }
     }
     if (now_millis >= next_time_millis)
