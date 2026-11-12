@@ -232,7 +232,7 @@ static void show_battery_v_and_roc(int16_t y)
     canvas.fillRect(v_rect_tlx, v_rect_tly, v_rect_w, v_rect_h, ST77XX_BLACK);
     canvas.print(buf);
     float roc = lipo.chargeRate();
-    roc = static_cast<float>((roc >= 0) ? roc + 0.05 : roc - 0.05);
+    if (roc != 0.0)  roc = static_cast<float>((roc >= 0.0) ? roc + 0.05 : roc - 0.05);
     snprintf(buf, sizeof(buf) - 1, "%4.1f", fabs(roc));
     canvas.getTextBounds("-99.9", 0, y, &x_rect, &y_rect, &w, &h);
     auto r_rect_w = static_cast<int16_t>(w - x_rect - 3);
@@ -280,13 +280,13 @@ static uint16_t bar_graph(uint32_t max_value, uint8_t threshold, uint16_t value,
 static void show_floor_range(int32_t range, int16_t y)
 {
     static bool once = false;
-    int32_t display_range = range;
+    //int32_t display_range;
     int16_t top_left_x;
     int16_t top_left_y;
     uint16_t text_w;
     uint16_t text_h;
     constexpr const char *max_field = "!***!";
-    char buf[10];
+    char buf[20];
     strncpy(buf, max_field, sizeof(buf));
 
     if (range < 15) return; // should never see valid reading < 15!
@@ -319,10 +319,10 @@ static void show_floor_range(int32_t range, int16_t y)
     Logger.debug("\n");
     index = (index + 1) % depth; // move history along
     if (abs(last_sum - sum) <= depth / 2) sum = last_sum; // less than 1 digit
-    auto avg_range = static_cast<int16_t>(static_cast<float>(sum) / depth /*+0.5*/);
+    auto avg_range = static_cast<int32_t>(static_cast<float>(sum) / depth /*+0.5*/);
     /* if (abs(avg_range - range) < 3) */
-    display_range = avg_range;
-    Logger.debug("<%s> [%zu]: R: %lu  A: %u  D: %lu  S: %lu  L: %lu\n",
+    auto display_range = avg_range;
+    Logger.debug("<%s> [%zu]: R: %lu  A: %lu  D: %lu  S: %lu  L: %lu\n",
         __func__, index, range, avg_range, display_range, sum, last_sum);
     last_range = range;
     last_sum = sum;
@@ -373,7 +373,7 @@ void loop()
 
             next_battery_millis = now_millis + battery_interval_ms;
             battery_status_display(0 /* X position */, 42 /* Y position */);
-            if (true || show_battery) show_battery_v_and_roc(75 /* Y position */);
+            if (show_battery) show_battery_v_and_roc(75 /* Y position */);
         }
     }
     if (now_millis >= next_time_millis)
