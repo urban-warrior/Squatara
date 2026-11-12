@@ -8,6 +8,8 @@
 
 static bool cli_begun=false;
 Cli inline cli;
+constexpr const int charge_detect_pin = 9;
+static bool show_battery = false;
 
 static void cli_enable_detect()
 {
@@ -21,6 +23,7 @@ static void cli_enable_detect()
 
     if (target_partition != nullptr)
     {
+        pinMode(charge_detect_pin, INPUT_PULLUP);
         Logger.debug("Found partition: %s\n", target_partition->label);
         uint8_t buffer[16];
         // Read 64 bytes starting from the beginning (offset 0) of that partition
@@ -30,13 +33,14 @@ static void cli_enable_detect()
             Logger.debug("%02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x %02x\n",
                 buffer[0], buffer[1], buffer[2], buffer[3], buffer[4], buffer[5], buffer[6], buffer[7],
                 buffer[8], buffer[9], buffer[10], buffer[11], buffer[12], buffer[13], buffer[14], buffer[15]);
-            uint32_t sentinel = buffer[15] << 24 | buffer[14] << 16 | buffer[13] << 8 | buffer[12];
+            auto sentinel = static_cast<uint32_t>(buffer[15] << 24 | buffer[14] << 16 | buffer[13] << 8 | buffer[12]);
             // Data is now populated in buffer as raw binary
-            Logger.debug("NVS: %p\n", (void *)(target_partition->address));
+            Logger.debug("NVS: %p\n", reinterpret_cast<void *>(target_partition->address));
             if (sentinel == 0xdeadbeef)
             {
                 cli.begin();
                 cli_begun = true;
+                show_battery = true;
             }
         }
         else
@@ -155,8 +159,8 @@ CLI_COMMAND(soc)
     float cell_vdc = lipo.cellVoltage();
     uint32_t uptime = millis()/1000;
 
-    ioStream.printf("{\"timestamp\":\"%lu\", \"SoC\":\"%0.1f\", \"Vdc\":\"%.2f\", \"RoC\":\"%.2f\"}\r\n",
-                    uptime, cell_soc, cell_vdc, cell_roc);
+    ioStream.printf("{\"timestamp\":\"%lu\", \"SoC\":\"%0.1f\", \"Vdc\":\"%.2f\", \"RoC\":\"%.2f\", \"CI\":\"%c\"}\r\n",
+                    uptime, cell_soc, cell_vdc, cell_roc, !digitalRead(charge_detect_pin) ? '+' : '-');
     return 0;
 }
 
@@ -316,8 +320,6 @@ CLI_COMMAND(gpio)
     }
     return 1;
 }
-
-static bool show_battery = false;
 
 CLI_COMMAND(batt)
 {
