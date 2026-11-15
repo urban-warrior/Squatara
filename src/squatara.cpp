@@ -118,7 +118,7 @@ void setup()
     setup_log_level();
     try_start_serial("\033[2J\033[1;1H" BUILD_STAMP);
     Logger.info("C++ Standard Value: %lu\n", __cplusplus);
-    Serial.printf("Wakeup: %u\n", esp_sleep_get_wakeup_cause()); // ESP_SLEEP_WAKEUP_TIMER
+    Logger.info("Wakeup: %u\n", esp_sleep_get_wakeup_cause()); // ESP_SLEEP_WAKEUP_TIMER
     setup_persistent();
 #ifdef SQUATARA_BUTTONS_H
     setup_buttons();
@@ -137,6 +137,11 @@ void setup()
         lipo.wake(); // disable hibernation
         Logger.info("HibThr<0x0A>: %1.1f  ActThr<0x0B>: %1.1f\n",
             lipo.getHibernationThreshold(), lipo.getActivityThreshold());
+        Logger.info("Reset V: %f\n", lipo.getResetVoltage());
+        float min_av;
+        float max_av;
+        lipo.getAlertVoltages(min_av, max_av);
+        Logger.info("Min Alert V: %f  Max Alert V: %f\n", min_av, max_av);
     }
     tof_configured = tof_sensor.configure();
     if (!tof_configured)
@@ -164,7 +169,7 @@ void setup()
     show_build();
     show_errors(tof_configured, floor_sensor_configured);
     digitalWrite(TFT_BACKLITE, HIGH);
-    Serial.printf("V?: %u\n", esp_sleep_is_valid_wakeup_gpio(GPIO_NUM_5)); // GPIO 5 is OK!
+    Logger.info("V?: %u\n", esp_sleep_is_valid_wakeup_gpio(GPIO_NUM_5)); // GPIO 5 is OK!
     timeout_start_screen(3000);
 #ifdef SQUATARA_CLI_COMMANDS_H
     cli_enable_detect();
