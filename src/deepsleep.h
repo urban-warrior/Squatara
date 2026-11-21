@@ -4,6 +4,14 @@
 #include "driver/rtc_io.h"
 #include <Fonts/FreeMonoBold18pt7b.h>
 
+static void powerswitch_init()
+{
+    rtc_gpio_init(GPIO_NUM_5);
+    rtc_gpio_set_direction(GPIO_NUM_5, RTC_GPIO_MODE_INPUT_ONLY);
+    rtc_gpio_pullup_dis(GPIO_NUM_5);
+    rtc_gpio_pulldown_dis(GPIO_NUM_5);
+}
+
 static void initiate_deep_sleep(unsigned long delay_ms, const char *msg, uint16_t color=ST77XX_GREEN)
 {
     if (delay_ms != 0)
@@ -18,7 +26,22 @@ static void initiate_deep_sleep(unsigned long delay_ms, const char *msg, uint16_
         display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
         delay(delay_ms);
     }
+    //digitalWrite(TFT_BACKLITE, LOW); // make sure backlight is off
+    // 1. Shut down I2C and isolate SDA/SCL so they don't back-power STEMMA QT sensors
+    Wire.end();
+    rtc_gpio_isolate(GPIO_NUM_3); // SDA
+    rtc_gpio_isolate(GPIO_NUM_4); // SCL
+    // 2. Shut down TFT, STEMMA QT power (GPIO 7), and NeoPixel (GPIO 21)
+    pinMode(TFT_BACKLITE, OUTPUT);
     digitalWrite(TFT_BACKLITE, LOW); // make sure backlight is off
+
+    pinMode(TFT_I2C_POWER, OUTPUT);
+    digitalWrite(TFT_I2C_POWER, LOW);
+    gpio_hold_en(static_cast<gpio_num_t>(TFT_I2C_POWER));
+
+    pinMode(NEOPIXEL_POWER, OUTPUT);
+    digitalWrite(NEOPIXEL_POWER, LOW);
+    gpio_hold_en(static_cast<gpio_num_t>(NEOPIXEL_POWER));
     // normally watching for "power switch" to go on, so notice when it goes HIGH
     // if "power switch" is on, need to wait for it to be off, so notice when it goes LOW
     if (esp_sleep_enable_ext0_wakeup(GPIO_NUM_5, !digitalRead(GPIO_NUM_5) ? HIGH : LOW))
@@ -27,11 +50,58 @@ static void initiate_deep_sleep(unsigned long delay_ms, const char *msg, uint16_
     }
     else
     {
-        rtc_gpio_isolate(GPIO_NUM_5);
+        //rtc_gpio_isolate(GPIO_NUM_5);
         Serial.printf("%s(): Entering deepsleep! [%u]\n", __func__, digitalRead(GPIO_NUM_5));
     }
     Serial.flush();
     esp_deep_sleep_start();
+}
+
+static void release_deep_sleep()
+{
+    // 1. Release deep sleep pin holds and restore normal GPIO control
+    gpio_deep_sleep_hold_dis();
+    gpio_hold_en(static_cast<gpio_num_t>(TFT_I2C_POWER));
+    gpio_hold_en(static_cast<gpio_num_t>(NEOPIXEL_POWER));
+    rtc_gpio_deinit(GPIO_NUM_3); // SDA
+    rtc_gpio_deinit(GPIO_NUM_4); // SCL
+    // 2. Restore power to STEMMA QT (VL53L4CD) and TFT
+    pinMode(TFT_I2C_POWER, OUTPUT);
+    digitalWrite(TFT_I2C_POWER, HIGH);
+    delay(10); // Give the VL53L4CD ~10ms to power up before I2C init
+    // 3. Re-initialize I2C and the VL53L4CD sensor
+    Wire.begin();
+    //tof_sensor.configure();
+    //floor_sensor.configure();
+}
+
+static void show_wakeup_cause(int16_t x=0, int16_t y=60)
+{
+    char buf[40];
+
+    esp_sleep_wakeup_cause_t cause = esp_sleep_get_wakeup_cause();
+    const char *cause_str = "UNKNOWN";
+    switch (cause)
+    {
+        case ESP_SLEEP_WAKEUP_UNDEFINED:    // reset was not caused by exit from deep sleep
+            cause_str = "RESET"; break;
+        case ESP_SLEEP_WAKEUP_EXT0:
+            cause_str = "POWER SWITCH"; break;
+        case ESP_SLEEP_WAKEUP_EXT1:
+            cause_str = "EXT1"; break;
+        case ESP_SLEEP_WAKEUP_TIMER:
+            cause_str = "TIMER"; break;
+        case ESP_SLEEP_WAKEUP_VBAT_UNDER_VOLT:   // Wakeup caused by VDD_BAT under voltage.
+            cause_str = "VBATT UNDERVOLT"; break;
+        default:
+            break;
+    }
+    snprintf(buf, sizeof(buf)-1, "%s  [%u]", cause_str, cause);
+    Logger.info("Wakeup: %s\n", buf);
+    canvas.setFont(&FreeMono9pt7b);
+    canvas.setTextColor(ST77XX_GREEN);
+    canvas_println_centered(buf, y);
+    display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
 }
 
 #endif  // DEEPSLEEP_H_
