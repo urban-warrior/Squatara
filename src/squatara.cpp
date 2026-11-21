@@ -74,7 +74,7 @@ static void show_build(int16_t y = 37)
     Logger.debug("<%s> X: %u  Y:%u\n", __func__, canvas.getCursorX(), canvas.getCursorY());
 }
 
-static void show_errors(bool tof, bool floor, int16_t y = 55)
+static void show_errors(bool tof, bool floor, int16_t y = 75)
 {
     canvas.setCursor(0, y);
     canvas.setTextColor(ST77XX_YELLOW);
@@ -103,22 +103,25 @@ static void timeout_start_screen(unsigned long ms)
     show_product_name();
 }
 
+constexpr float minimum_allowed_vdc = 3.3 /* volts */;
+
 void setup()
 {
-    pinMode(GPIO_NUM_5, INPUT);
+    //pinMode(GPIO_NUM_5, INPUT);
+    powerswitch_init();
     bool lipo_started = lipo.begin();
     if (lipo_started)
     {
         delay(500); // settle LIPO
-        if (!digitalRead(GPIO_NUM_5) || (lipo.cellVoltage() <= 3.0))
+        if (!digitalRead(GPIO_NUM_5) || (lipo.cellVoltage() <= minimum_allowed_vdc))
             initiate_deep_sleep(0 /* don't do anything except sleep */, nullptr /* no text -- no color */);
     }
+    release_deep_sleep();
     preferences.begin("configuration", false /* read-write */);
     Logger.addOutput(&Serial);
     setup_log_level();
     try_start_serial("\033[2J\033[1;1H" BUILD_STAMP);
     Logger.info("C++ Standard Value: %lu\n", __cplusplus);
-    Logger.info("Wakeup: %u\n", esp_sleep_get_wakeup_cause()); // ESP_SLEEP_WAKEUP_TIMER
     setup_persistent();
 #ifdef SQUATARA_BUTTONS_H
     setup_buttons();
@@ -170,15 +173,16 @@ void setup()
     show_errors(tof_configured, floor_sensor_configured);
     digitalWrite(TFT_BACKLITE, HIGH);
     Logger.info("V?: %u\n", esp_sleep_is_valid_wakeup_gpio(GPIO_NUM_5)); // GPIO 5 is OK!
-    timeout_start_screen(3000);
 #ifdef SQUATARA_CLI_COMMANDS_H
     cli_enable_detect();
     if (cli_begun)
     {
         Serial.println("\nCLI ready -- type 'help' for commands");
         cli.refreshPrompt();
+        show_wakeup_cause();
     }
 #endif  // SQUATARA_CLI_COMMANDS_H
+    timeout_start_screen(3000);
     buzzer.on();
     delay(250 /* ms */);
     buzzer.off();
@@ -189,8 +193,10 @@ static void battery_status_display(int16_t x, int16_t y)
     float cell_soc = lipo.cellPercent();
     [[maybe_unused]] float cell_roc = lipo.chargeRate();
     [[maybe_unused]] float cell_vdc = lipo.cellVoltage();
-    constexpr float minimum_allowed_soc = 1.0 /* percent */;
-    constexpr float warning_soc = 2.0 /* percent */;
+    //constexpr float minimum_allowed_soc = 1.0 /* percent */;
+    //constexpr float minimum_allowed_vdc = 3.0 /* volts */;
+    //constexpr float minimum_allowed_vdc = 3.3 /* volts */;
+    constexpr float warning_soc = 2.0 /* percent */;  // TODO
     char buf[40];
     constexpr uint16_t bar_graph_height = 15;
     constexpr int16_t bar_graph_margin = 8;
@@ -203,7 +209,8 @@ static void battery_status_display(int16_t x, int16_t y)
 
     if (cell_soc > 100.0) cell_soc = 100.0;
     snprintf(buf, sizeof(buf) - 1, "%3.0f%%", cell_soc);
-    if (cell_soc <= minimum_allowed_soc) initiate_deep_sleep(10000, "LOW BATT", ST77XX_RED);
+    //if (cell_soc <= minimum_allowed_soc) initiate_deep_sleep(10000, "LOW BATT", ST77XX_RED);
+    if (cell_vdc <= minimum_allowed_vdc) initiate_deep_sleep(10000, "LOW BATT", ST77XX_RED);
     uint16_t battery_status_color = (cell_soc >= warning_soc) ? BAR_GRAPH_COLOR : ST77XX_RED;
     canvas.setTextColor((cell_roc <= 0.0) ? battery_status_color : ST77XX_GREEN);
     canvas.setFont(&DejaVu_Sans_Mono_14);
@@ -246,7 +253,8 @@ static void show_battery_v_and_roc(int16_t y)
     auto r_rect_h = static_cast<int16_t>(h + 2);
     canvas.fillRect(r_rect_tlx, r_rect_tly, r_rect_w, r_rect_h, ST77XX_BLACK);
     canvas.setCursor(static_cast<int16_t>(r_rect_tlx + 5), y);
-    canvas.setTextColor(roc >= 0 ? ST77XX_CYAN : ST77XX_RED);
+    //canvas.setTextColor(roc >= 0 ? ST77XX_CYAN : ST77XX_RED);
+    canvas.setTextColor(roc >= 0 ? ST77XX_WHITE : ST77XX_RED);
     canvas.print(buf);
     display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
 }
