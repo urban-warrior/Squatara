@@ -49,11 +49,11 @@ static void initiate_deep_sleep(unsigned long delay_ms, const char *msg, uint16_
     // if "power switch" is on, need to wait for it to be off, so notice when it goes LOW
     if (esp_sleep_enable_ext0_wakeup(POWER_SWITCH, !digitalRead(POWER_SWITCH) ? HIGH : LOW))
     {
-        Serial.printf("%s(): ERROR\n", __func__);
+        Logger.error("%s(): ERROR\n", __func__);
     }
     else
     {
-        Serial.printf("%s(): Entering deepsleep! [%u]\n", __func__, digitalRead(POWER_SWITCH));
+        Logger.info("%s(): Entering deepsleep! [%u]\n", __func__, digitalRead(POWER_SWITCH));
     }
     Serial.flush();
     esp_deep_sleep_start();
@@ -61,9 +61,6 @@ static void initiate_deep_sleep(unsigned long delay_ms, const char *msg, uint16_
 
 static void release_deep_sleep()
 {
-#if 0
-    if (esp_sleep_get_wakeup_cause() == ESP_SLEEP_WAKEUP_EXT0) ESP.restart();;
-#else
     // 1. Release deep sleep pin holds and restore normal GPIO control
     gpio_deep_sleep_hold_dis();
     gpio_hold_dis(static_cast<gpio_num_t>(SDA));
@@ -80,7 +77,6 @@ static void release_deep_sleep()
     delay(500); // Give the VL53L4CD ~10ms to power up before I2C init
     // 3. Re-initialize I2C and the VL53L4CD sensor
     Wire.begin(SDA, SCL);
-#endif
 }
 
 static void show_wakeup_cause(int16_t x=0, int16_t y=60)
