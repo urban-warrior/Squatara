@@ -176,9 +176,9 @@ void setup()
     cli_enable_detect();
     if (cli_begun)
     {
+        show_wakeup_cause();
         Serial.println("\nCLI ready -- type 'help' for commands");
         cli.refreshPrompt();
-        show_wakeup_cause();
     }
 #endif  // SQUATARA_CLI_COMMANDS_H
     timeout_start_screen(3000);
@@ -186,6 +186,45 @@ void setup()
     delay(250 /* ms */);
     buzzer.off();
 } // end setup()
+
+#if 1
+static float generated_soc()
+{
+    static float soc = 0.0;
+    static float last_soc = -1.0;
+
+    pinMode(2, INPUT_PULLDOWN);
+    if (digitalRead(2))
+    {
+        if (soc == 10.0)
+        {
+            soc -= 5.0;
+        }
+        else
+        {
+            soc -= (soc > 10.0) ? 10.0 : 1.0;
+        }
+        if (soc <= 0.0 && last_soc == 0.0) soc = 100.0;
+    }
+
+    if (soc != last_soc) Serial.printf("Generated soc: %f\n", soc);
+    last_soc = soc;
+    while (digitalRead(2)) {}
+    return soc;
+}
+#endif // 1
+
+static void draw_battery_element(int16_t x, int16_t y, uint16_t central_color, uint16_t bg_color, int16_t w, int16_t h)
+{
+    constexpr int16_t border_width = 4;
+    int16_t central_x = x + border_width;
+    int16_t central_y = y + border_width;
+    int16_t central_w = w - 2*border_width;
+    int16_t central_h = h - 2*border_width;
+    canvas.fillRect(x, y, w, h, bg_color);
+    canvas.fillRect(central_x, central_y, central_w, central_h, ST77XX_BLACK);
+    canvas.fillRect(central_x, central_y, central_w, central_h, central_color);
+}
 
 static void battery_status_display(int16_t x, int16_t y)
 {
@@ -201,23 +240,29 @@ static void battery_status_display(int16_t x, int16_t y)
     [[maybe_unused]] float cell_roc = lipo.chargeRate();
     constexpr float warning_soc = 2.0 /* percent */;
     //char buf[40];
-    constexpr uint16_t bar_graph_height = 15;
+    constexpr uint16_t bar_graph_height = 16;
     constexpr int16_t bar_graph_margin = 8;
     constexpr uint16_t bar_graph_width = 200;
     constexpr uint16_t BAR_GRAPH_COLOR = ST77XX_BLUE;
     constexpr int16_t y_offset = 20;
 
+    cell_soc = generated_soc(); // TODO temporary
     y = static_cast<int16_t>(y - y_offset);
     auto y_rect = static_cast<int16_t>(y + bar_graph_margin);
-    
     //snprintf(buf, sizeof(buf) - 1, "%3.0f%%", cell_soc);
     uint16_t battery_status_color = (cell_soc >= warning_soc) ? BAR_GRAPH_COLOR : ST77XX_RED;
     //canvas.setTextColor((cell_roc <= 0.0) ? battery_status_color : ST77XX_GREEN);
     //canvas.setFont(&DejaVu_Sans_Mono_14);
     canvas.fillRect(x, y_rect, DISPLAY_WIDTH, bar_graph_height, ST77XX_BLACK /* ST77XX_RED */);
     canvas.drawRect(x, y_rect, bar_graph_width, bar_graph_height, battery_status_color);
-    canvas.fillRect(x, y_rect, static_cast<int16_t>((bar_graph_width * (cell_soc + 0.5)) / 100), bar_graph_height,
-                    battery_status_color);
+    int soc_percent = static_cast<int>(cell_soc);
+    int16_t element_x = x;
+    while (soc_percent > 0)
+    {
+        draw_battery_element(element_x, y_rect, ST77XX_GREEN, battery_status_color, bar_graph_width/10, bar_graph_height);
+        element_x += bar_graph_width/10;
+        soc_percent -= 10;
+    }
     //canvas.setCursor(static_cast<int16_t>(x + bar_graph_width + 4), static_cast<int16_t>(y + 20)); // move to value field
     //canvas.print(buf);
     canvas.setCursor(x, y); //restore cursor position
