@@ -137,13 +137,13 @@ void setup()
     else
     {
         lipo.wake(); // disable hibernation
-        Logger.info("HibThr<0x0A>: %1.1f  ActThr<0x0B>: %1.1f\n",
+        Logger.debug("HibThr<0x0A>: %1.1f  ActThr<0x0B>: %1.1f\n",
             lipo.getHibernationThreshold(), lipo.getActivityThreshold());
-        Logger.info("Reset V: %f\n", lipo.getResetVoltage());
+        Logger.debug("Reset V: %f\n", lipo.getResetVoltage());
         float min_av;
         float max_av;
         lipo.getAlertVoltages(min_av, max_av);
-        Logger.info("Min Alert V: %f  Max Alert V: %f\n", min_av, max_av);
+        Logger.debug("Min Alert V: %f  Max Alert V: %f\n", min_av, max_av);
     }
     tof_configured = tof_sensor.configure();
     if (!tof_configured)
@@ -161,7 +161,7 @@ void setup()
     }
     else
     {
-        Logger.info("Floor sensor found\n");
+        Logger.debug("Floor sensor found\n");
     }
 
 #ifdef SQUATARA_BUTTONS_H
@@ -372,7 +372,7 @@ void loop()
 
     if (!digitalRead(POWER_SWITCH)) // watch for power switch
     {
-        delay(200); // wait some time for debounce
+        delay(50); // wait some time for debounce
         if (!digitalRead(POWER_SWITCH)) initiate_deep_sleep(1000 /* ms */, "Bye!", ST77XX_GREEN); // won't return!
     }
 
