@@ -107,21 +107,22 @@ constexpr float minimum_allowed_vdc = 3.3 /* volts */;
 
 void setup()
 {
-    //pinMode(GPIO_NUM_5, INPUT);
+    release_deep_sleep();
     powerswitch_init();
     bool lipo_started = lipo.begin();
-    if (lipo_started)
+    if (lipo_started) delay(500); // settle LIPO
     {
-        delay(500); // settle LIPO
-        if (!digitalRead(GPIO_NUM_5) || (lipo.cellVoltage() <= minimum_allowed_vdc))
+        if (!digitalRead(POWER_SWITCH) || (lipo_started && (lipo.cellVoltage() <= minimum_allowed_vdc)))
             initiate_deep_sleep(0 /* don't do anything except sleep */, nullptr /* no text -- no color */);
     }
-    release_deep_sleep();
+    //release_deep_sleep();
     preferences.begin("configuration", false /* read-write */);
     Logger.addOutput(&Serial);
     setup_log_level();
     try_start_serial("\033[2J\033[1;1H" BUILD_STAMP);
     Logger.info("C++ Standard Value: %lu\n", __cplusplus);
+    Serial.printf("lipo.begin(): %u\n", lipo.begin());
+    Serial.printf("lipo.cellVoltage(): %f\n", lipo.cellVoltage());
     setup_persistent();
 #ifdef SQUATARA_BUTTONS_H
     setup_buttons();
@@ -153,7 +154,7 @@ void setup()
     }
     else
     {
-        Logger.info("max distance: %lu mm\n", tof_sensor.max_mm);
+        Logger.debug("max distance: %lu mm\n", tof_sensor.max_mm);
     }
     bool floor_sensor_configured = floor_sensor.configure();
     if (!floor_sensor_configured)
@@ -172,7 +173,7 @@ void setup()
     show_build();
     show_errors(tof_configured, floor_sensor_configured);
     digitalWrite(TFT_BACKLITE, HIGH);
-    Logger.info("V?: %u\n", esp_sleep_is_valid_wakeup_gpio(GPIO_NUM_5)); // GPIO 5 is OK!
+    Logger.info("V?: %u\n", esp_sleep_is_valid_wakeup_gpio(POWER_SWITCH)); // GPIO 5 is OK!
 #ifdef SQUATARA_CLI_COMMANDS_H
     cli_enable_detect();
     if (cli_begun)
@@ -372,10 +373,10 @@ void loop()
     static unsigned long next_battery_millis = 0;
     unsigned long now_millis = millis();
 
-    if (!digitalRead(GPIO_NUM_5)) // watch for power switch
+    if (!digitalRead(POWER_SWITCH)) // watch for power switch
     {
         delay(200); // wait some time for debounce
-        if (!digitalRead(GPIO_NUM_5)) initiate_deep_sleep(3000 /* ms */, "Bye!", ST77XX_GREEN); // won't return!
+        if (!digitalRead(POWER_SWITCH)) initiate_deep_sleep(1000 /* ms */, "Bye!", ST77XX_GREEN); // won't return!
     }
 
     if (preferences.getBool(BATTERY_KEY))
@@ -410,7 +411,7 @@ void loop()
 
             if (print_cnt-- > 0)
             {
-                Logger.info("<%s> range: %lu mm -- measurement time: %lu ms\n", __func__, range, measurement_ms);
+                Logger.debug("<%s> range: %lu mm -- measurement time: %lu ms\n", __func__, range, measurement_ms);
             }
 
             if (range >= 0)
