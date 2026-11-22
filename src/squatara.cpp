@@ -121,8 +121,6 @@ void setup()
     setup_log_level();
     try_start_serial("\033[2J\033[1;1H" BUILD_STAMP);
     Logger.info("C++ Standard Value: %lu\n", __cplusplus);
-    Serial.printf("lipo.begin(): %u\n", lipo.begin());
-    Serial.printf("lipo.cellVoltage(): %f\n", lipo.cellVoltage());
     setup_persistent();
 #ifdef SQUATARA_BUTTONS_H
     setup_buttons();
@@ -134,7 +132,7 @@ void setup()
     Logger.info("Display w: %u  h: %u\n", display.width(), display.height());
     if (!lipo_started)
     {
-        Serial.println("LIPO not found");
+        Logger.error("LIPO not found\n");
     }
     else
     {
@@ -150,7 +148,7 @@ void setup()
     tof_configured = tof_sensor.configure();
     if (!tof_configured)
     {
-        Serial.println("Distance sensor error!");
+        Logger.error("Distance sensor error!\n");
     }
     else
     {
@@ -159,11 +157,11 @@ void setup()
     bool floor_sensor_configured = floor_sensor.configure();
     if (!floor_sensor_configured)
     {
-        Serial.println("Floor sensor error!");
+        Logger.error("Floor sensor error!\n");
     }
     else
     {
-        Logger.info("Floor sensor found");
+        Logger.info("Floor sensor found\n");
     }
 
 #ifdef SQUATARA_BUTTONS_H
@@ -173,7 +171,7 @@ void setup()
     show_build();
     show_errors(tof_configured, floor_sensor_configured);
     digitalWrite(TFT_BACKLITE, HIGH);
-    Logger.info("V?: %u\n", esp_sleep_is_valid_wakeup_gpio(POWER_SWITCH)); // GPIO 5 is OK!
+    Logger.debug("POWER_SWITCH GPIO valid wakeup source: %u\n", esp_sleep_is_valid_wakeup_gpio(POWER_SWITCH)); // GPIO 5 is OK!
 #ifdef SQUATARA_CLI_COMMANDS_H
     cli_enable_detect();
     if (cli_begun)
@@ -326,7 +324,6 @@ static void show_floor_range(int32_t range, int16_t y)
     for (size_t i = 0; i < depth; i++)
     {
         size_t history_i = (index + i) % depth;
-        Logger.debug("<%s> %zu  H: %u\n", __func__, i, history_i);
         Logger.debug("<%s> [%zu(%zu)] %lu  ", __func__, i, history_i, history[history_i]);
         sum += history[history_i];
     }
