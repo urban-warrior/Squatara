@@ -240,14 +240,7 @@ static void draw_battery_element(int16_t x, int16_t y, uint16_t central_color, u
 static void battery_status_display(int16_t x, int16_t y)
 {
     float cell_soc = estimate_soc();
-    //if (cell_vdc <= minimum_allowed_vdc) initiate_deep_sleep(5000, "LOW BATT", ST77XX_RED);
-    //constexpr float max_lipo_vdc = 4.2;
-    //float cell_soc = (cell_vdc - minimum_allowed_vdc)/(max_lipo_vdc - minimum_allowed_vdc); // raw percentage SoC (linear)
-    //cell_soc = cell_soc * 100.0; // convert to percent
-    //Serial.printf("soc: %f  cell: %f  min: %f  \n", cell_soc, cell_vdc, minimum_allowed_vdc);
-    //if (cell_soc < 0.0) cell_soc = 0.0;  // clamp negative to zero
     if (cell_soc >= 99.0) cell_soc = 100.0; // clamp to max for display
-    //Serial.printf("clamped soc: %f  cell: %f  min: %f  \n", cell_soc, cell_vdc, minimum_allowed_vdc);
     [[maybe_unused]] float cell_roc = lipo.chargeRate();
     constexpr float warning_soc = 2.0 /* percent */;
     //char buf[40];
