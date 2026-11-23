@@ -51,6 +51,18 @@ static void esp32_reset()
     ESP.restart();
 }
 
+constexpr float minimum_allowed_vdc = 3.3 /* volts */;
+
+static float estimate_soc()
+{
+    constexpr float max_lipo_vdc = 4.2;
+    float estimated_soc = (lipo.cellVoltage() - minimum_allowed_vdc)/(max_lipo_vdc - minimum_allowed_vdc); // raw percentage SoC (linear)
+    estimated_soc = estimated_soc * 100.0; // convert to percent
+    if (estimated_soc < 0.0) estimated_soc = 0.0;  // clamp negative to zero
+    if (estimated_soc > 100.0) estimated_soc = 100.0; // clamp to max
+    return estimated_soc;
+}
+
 // #include "buttons.h"
 #include "cli_commands.h"
 
@@ -102,8 +114,6 @@ static void timeout_start_screen(unsigned long ms)
     canvas.fillScreen(ST77XX_BLACK);
     show_product_name();
 }
-
-constexpr float minimum_allowed_vdc = 3.3 /* volts */;
 
 void setup()
 {
@@ -216,11 +226,12 @@ static float generated_soc()
 
 static void draw_battery_element(int16_t x, int16_t y, uint16_t central_color, uint16_t bg_color, int16_t w, int16_t h)
 {
-    constexpr int16_t border_width = 4;
-    int16_t central_x = x + border_width;
-    int16_t central_y = y + border_width;
-    int16_t central_w = w - 2*border_width;
-    int16_t central_h = h - 2*border_width;
+    constexpr int16_t x_border_width = 2;
+    constexpr int16_t y_border_width = 6;
+    int16_t central_x = x + x_border_width;
+    int16_t central_y = y + y_border_width;
+    int16_t central_w = w - 2*x_border_width;
+    int16_t central_h = h - 2*y_border_width;
     canvas.fillRect(x, y, w, h, bg_color);
     canvas.fillRect(central_x, central_y, central_w, central_h, ST77XX_BLACK);
     canvas.fillRect(central_x, central_y, central_w, central_h, central_color);
@@ -228,14 +239,14 @@ static void draw_battery_element(int16_t x, int16_t y, uint16_t central_color, u
 
 static void battery_status_display(int16_t x, int16_t y)
 {
-    float cell_vdc = lipo.cellVoltage();
-    if (cell_vdc <= minimum_allowed_vdc) initiate_deep_sleep(5000, "LOW BATT", ST77XX_RED);
-    constexpr float max_lipo_vdc = 4.2;
-    float cell_soc = (cell_vdc - minimum_allowed_vdc)/(max_lipo_vdc - minimum_allowed_vdc); // raw percentage SoC (linear)
-    cell_soc = cell_soc * 100.0; // convert to percent
+    float cell_soc = estimate_soc();
+    //if (cell_vdc <= minimum_allowed_vdc) initiate_deep_sleep(5000, "LOW BATT", ST77XX_RED);
+    //constexpr float max_lipo_vdc = 4.2;
+    //float cell_soc = (cell_vdc - minimum_allowed_vdc)/(max_lipo_vdc - minimum_allowed_vdc); // raw percentage SoC (linear)
+    //cell_soc = cell_soc * 100.0; // convert to percent
     //Serial.printf("soc: %f  cell: %f  min: %f  \n", cell_soc, cell_vdc, minimum_allowed_vdc);
-    if (cell_soc < 0.0) cell_soc = 0.0;  // clamp negative to zero
-    if (cell_soc > 100.0) cell_soc = 100.0; // clamp to max
+    //if (cell_soc < 0.0) cell_soc = 0.0;  // clamp negative to zero
+    if (cell_soc >= 99.0) cell_soc = 100.0; // clamp to max for display
     //Serial.printf("clamped soc: %f  cell: %f  min: %f  \n", cell_soc, cell_vdc, minimum_allowed_vdc);
     [[maybe_unused]] float cell_roc = lipo.chargeRate();
     constexpr float warning_soc = 2.0 /* percent */;
@@ -246,7 +257,7 @@ static void battery_status_display(int16_t x, int16_t y)
     constexpr uint16_t BAR_GRAPH_COLOR = ST77XX_BLUE;
     constexpr int16_t y_offset = 20;
 
-    cell_soc = generated_soc(); // TODO temporary
+    //cell_soc = generated_soc(); // TODO temporary
     y = static_cast<int16_t>(y - y_offset);
     auto y_rect = static_cast<int16_t>(y + bar_graph_margin);
     //snprintf(buf, sizeof(buf) - 1, "%3.0f%%", cell_soc);
