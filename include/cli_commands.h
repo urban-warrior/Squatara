@@ -6,7 +6,7 @@
 #include "i2c-scan.h"
 #include <charconv>
 
-static bool cli_begun=false;
+[[ maybe_unused ]] static bool cli_begun=false;
 Cli inline cli;
 constexpr const int charge_detect_pin = 9;
 static bool show_battery = false;
@@ -157,10 +157,11 @@ CLI_COMMAND(soc)
     float cell_soc = lipo.cellPercent();
     float cell_roc = lipo.chargeRate();
     float cell_vdc = lipo.cellVoltage();
+    float estimated_soc = estimate_soc();
     uint32_t uptime = millis()/1000;
 
-    ioStream.printf("{\"timestamp\":\"%lu\", \"SoC\":\"%0.1f\", \"Vdc\":\"%.2f\", \"RoC\":\"%.2f\", \"CI\":\"%c\"}\r\n",
-                    uptime, cell_soc, cell_vdc, cell_roc, !digitalRead(charge_detect_pin) ? '+' : '-');
+    ioStream.printf("{\"timestamp\":\"%lu\", \"SoC\":\"%0.1f\", \"EstSoC\":\"%0.1f\", \"Vdc\":\"%.2f\", \"RoC\":\"%.2f\", \"CI\":\"%c\"}\r\n",
+                    uptime, cell_soc, estimated_soc, cell_vdc, cell_roc, !digitalRead(charge_detect_pin) ? '+' : '-');
     return 0;
 }
 
