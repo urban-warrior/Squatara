@@ -57,7 +57,7 @@ static float estimate_soc()
 {
     constexpr float max_lipo_vdc = 4.2;
     float estimated_soc = (lipo.cellVoltage() - minimum_allowed_vdc)/(max_lipo_vdc - minimum_allowed_vdc); // raw percentage SoC (linear)
-    estimated_soc = estimated_soc * 100.0; // convert to percent
+    estimated_soc = estimated_soc * 100.0f; // convert to percent
     if (estimated_soc < 0.0) estimated_soc = 0.0;  // clamp negative to zero
     if (estimated_soc > 100.0) estimated_soc = 100.0; // clamp to max
     return estimated_soc;
@@ -197,7 +197,7 @@ void setup()
     buzzer.off();
 } // end setup()
 
-#if 1
+#if 0
 static float generated_soc()
 {
     static float soc = 0.0;
@@ -228,35 +228,63 @@ static void draw_battery_element(int16_t x, int16_t y, uint16_t central_color, u
 {
     constexpr int16_t x_border_width = 2;
     constexpr int16_t y_border_width = 6;
-    int16_t central_x = x + x_border_width;
-    int16_t central_y = y + y_border_width;
-    int16_t central_w = w - 2*x_border_width;
-    int16_t central_h = h - 2*y_border_width;
+    auto central_x = static_cast<int16_t>(x + x_border_width);
+    auto central_y = static_cast<int16_t>(y + y_border_width);
+    auto central_w = static_cast<int16_t>(w - 2*x_border_width);
+    auto central_h = static_cast<int16_t>(h - 2*y_border_width);
     canvas.fillRect(x, y, w, h, bg_color);
     canvas.fillRect(central_x, central_y, central_w, central_h, ST77XX_BLACK);
     canvas.fillRect(central_x, central_y, central_w, central_h, central_color);
 }
 
+static void show_battery_soc(float cell_soc, int16_t x, int16_t y, uint16_t roc_color)
+{
+    float cell_roc = lipo.chargeRate();
+    char buf[40];
+    uint16_t roc_display_color = (cell_roc <= 0.0) ? roc_color : ST77XX_GREEN;
+    canvas.setTextColor(roc_display_color);
+    if (show_battery_soc_percent)
+    {
+        snprintf(buf, sizeof(buf) - 1, "%3.0f%%", cell_soc);
+        canvas.setFont(&DejaVu_Sans_Mono_14);
+        canvas.setCursor(x, y); // move to value field
+        canvas.print(buf);
+    }
+    else
+    {
+        constexpr int16_t spot_size = 6;
+        constexpr int16_t x_spot_offset = 18;
+        constexpr int16_t y_spot_offset = -7;
+        uint16_t roc_spot_color = (cell_roc <= 0.0) ? ST77XX_BLACK : ST77XX_GREEN;
+        canvas.fillRect(static_cast<int16_t>(x + x_spot_offset), static_cast<int16_t>(y + y_spot_offset),
+            spot_size, spot_size, roc_spot_color);
+    }
+
+}
+
 static void battery_status_display(int16_t x, int16_t y)
 {
     float cell_soc = estimate_soc();
+    static float last_cell_soc = 0.0;
     if (cell_soc >= 99.0) cell_soc = 100.0; // clamp to max for display
-    [[maybe_unused]] float cell_roc = lipo.chargeRate();
     constexpr float warning_soc = 2.0 /* percent */;
-    //char buf[40];
     constexpr uint16_t bar_graph_height = 16;
     constexpr int16_t bar_graph_margin = 8;
     constexpr uint16_t bar_graph_width = 200;
     constexpr uint16_t BAR_GRAPH_COLOR = ST77XX_BLUE;
     constexpr int16_t y_offset = 20;
 
-    //cell_soc = generated_soc(); // TODO temporary
+    if (fabs(cell_soc - last_cell_soc) < 2.0) // 2% hysteresis band
+    {
+        cell_soc = last_cell_soc;
+    }
+    else
+    {
+        last_cell_soc = cell_soc;
+    }
     y = static_cast<int16_t>(y - y_offset);
     auto y_rect = static_cast<int16_t>(y + bar_graph_margin);
-    //snprintf(buf, sizeof(buf) - 1, "%3.0f%%", cell_soc);
     uint16_t battery_status_color = (cell_soc >= warning_soc) ? BAR_GRAPH_COLOR : ST77XX_RED;
-    //canvas.setTextColor((cell_roc <= 0.0) ? battery_status_color : ST77XX_GREEN);
-    //canvas.setFont(&DejaVu_Sans_Mono_14);
     canvas.fillRect(x, y_rect, DISPLAY_WIDTH, bar_graph_height, ST77XX_BLACK /* ST77XX_RED */);
     canvas.drawRect(x, y_rect, bar_graph_width, bar_graph_height, battery_status_color);
     int soc_percent = static_cast<int>(cell_soc);
@@ -267,8 +295,7 @@ static void battery_status_display(int16_t x, int16_t y)
         element_x += bar_graph_width/10;
         soc_percent -= 10;
     }
-    //canvas.setCursor(static_cast<int16_t>(x + bar_graph_width + 4), static_cast<int16_t>(y + 20)); // move to value field
-    //canvas.print(buf);
+    show_battery_soc(cell_soc, static_cast<int16_t>(x + bar_graph_width + 4), static_cast<int16_t>(y + 20), BAR_GRAPH_COLOR);
     canvas.setCursor(x, y); //restore cursor position
     display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
 }
