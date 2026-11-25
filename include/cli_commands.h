@@ -10,6 +10,7 @@
 Cli inline cli;
 constexpr const int charge_detect_pin = 9;
 static bool show_battery = false;
+static bool show_battery_soc_percent = false;
 
 static void cli_enable_detect()
 {
@@ -41,6 +42,7 @@ static void cli_enable_detect()
                 cli.begin();
                 cli_begun = true;
                 show_battery = true;
+                show_battery_soc_percent = true;
             }
         }
         else
