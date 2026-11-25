@@ -197,33 +197,6 @@ void setup()
     buzzer.off();
 } // end setup()
 
-#if 0
-static float generated_soc()
-{
-    static float soc = 0.0;
-    static float last_soc = -1.0;
-
-    pinMode(2, INPUT_PULLDOWN);
-    if (digitalRead(2))
-    {
-        if (soc == 10.0)
-        {
-            soc -= 5.0;
-        }
-        else
-        {
-            soc -= (soc > 10.0) ? 10.0 : 1.0;
-        }
-        if (soc <= 0.0 && last_soc == 0.0) soc = 100.0;
-    }
-
-    if (soc != last_soc) Serial.printf("Generated soc: %f\n", soc);
-    last_soc = soc;
-    while (digitalRead(2)) {}
-    return soc;
-}
-#endif // 1
-
 static void draw_battery_element(int16_t x, int16_t y, uint16_t central_color, uint16_t bg_color, int16_t w, int16_t h)
 {
     constexpr int16_t x_border_width = 2;
