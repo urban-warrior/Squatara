@@ -79,7 +79,7 @@ static void release_deep_sleep()
     Wire.begin(SDA, SCL);
 }
 
-static void show_wakeup_cause(int16_t x=0, int16_t y=60)
+static void show_wakeup_cause(int16_t x=0, int16_t y=75)
 {
     char buf[40];
 
