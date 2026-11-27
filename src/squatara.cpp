@@ -14,6 +14,10 @@
 #include <DebugLogger.h>
 #include "persistent.h"
 
+#ifndef GIT_TAG
+#define GIT_TAG "Unknown Tag"
+#endif // GIT_TAG
+
 static Adafruit_MAX17048 lipo;
 static Adafruit_ST7789 display = Adafruit_ST7789(TFT_CS, TFT_DC, TFT_RST);
 static ToF_Sensor tof_sensor(&Wire, 11, 0x30); // don't use default first! NOLINT(*-interfaces-global-init)
@@ -82,17 +86,23 @@ static void show_build(int16_t y = 37)
     canvas.setTextColor(ST77XX_RED);
     canvas.setFont(&FreeMono9pt7b);
     canvas_println_centered(__DATE__ "@" __TIME__, canvas.getCursorY());
+    canvas_println_centered(GIT_TAG, canvas.getCursorY());
     display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
     Logger.debug("<%s> X: %u  Y:%u\n", __func__, canvas.getCursorX(), canvas.getCursorY());
 }
 
-static void show_errors(bool tof, bool floor, int16_t y = 75)
+static void show_errors(bool tof, bool floor, int16_t y = 90)
 {
     canvas.setCursor(0, y);
     canvas.setTextColor(ST77XX_YELLOW);
     canvas.setFont(&FreeMono9pt7b);
-    if ( !tof) canvas.println("No Presence Sensor!");
-    if ( !floor) canvas.println("No Floor Sensor!");
+    int missing_sensors = 0;
+    if ( !tof) missing_sensors |= (1 << 0);
+    //if ( !tof) canvas.println("No Presence Sensor!");
+    if ( !floor) missing_sensors |= (1 << 1);
+    //if ( !floor) canvas.println("No Floor Sensor!");
+    if (missing_sensors) canvas.printf("%s%s sensor%s?",
+        missing_sensors & (1 << 0) ? " Detect": "", missing_sensors & (1 << 1) ? " Floor": "",  missing_sensors == 3 ? "s" : "");
     display.drawRGBBitmap(0, 0, canvas.getBuffer(), DISPLAY_WIDTH, DISPLAY_HEIGHT);
     Logger.debug("<%s> X: %u  Y:%u\n", __func__, canvas.getCursorX(), canvas.getCursorY());
 }
